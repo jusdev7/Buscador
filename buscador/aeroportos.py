@@ -26,6 +26,21 @@ CIDADES: dict[str, list[str]] = {
     "MDZ": ["MDZ"],
     "BRC": ["BRC"],
     "IGU": ["IGU"],
+    # Ásia
+    "TYO": ["NRT", "HND"],
+    "OSA": ["KIX"],
+    "SEL": ["ICN"],
+    "BJS": ["PEK", "PKX"],
+    "SHA": ["PVG"],
+    "CAN": ["CAN"],
+    "HKG": ["HKG"],
+}
+
+# País → aeroportos principais (para "o destino mais barato do país").
+PAISES: dict[str, list[str]] = {
+    "JAPAO": ["NRT", "HND", "KIX"],
+    "COREIA": ["ICN"],
+    "CHINA": ["PEK", "PKX", "PVG", "CAN"],
 }
 
 APELIDOS: dict[str, str] = {
@@ -60,19 +75,54 @@ APELIDOS: dict[str, str] = {
     "BARILOCHE": "BRC",
     "FOZ DO IGUACU": "IGU",
     "FOZ DO IGUAÇU": "IGU",
+    "TOQUIO": "TYO",
+    "TÓQUIO": "TYO",
+    "OSAKA": "OSA",
+    "SEUL": "SEL",
+    "PEQUIM": "BJS",
+    "XANGAI": "SHA",
+    "HONG KONG": "HKG",
+    "JAPÃO": "JAPAO",
+    "JAPAN": "JAPAO",
+    "COREIA DO SUL": "COREIA",
+    "CORÉIA": "COREIA",
 }
 
 # Cidades por onde vale testar uma conexão montada (duas passagens separadas).
 HUBS: list[str] = ["GRU", "GIG", "BSB", "FLN", "POA", "CWB", "IGU", "MVD", "ASU", "SCL", "LIM"]
+
+# Conexões para voos de longa distância (Ásia, Europa...).
+HUBS_LONGOS: list[str] = [
+    "DOH", "DXB", "AUH", "IST", "ADD",  # Oriente Médio / África
+    "CDG", "FRA", "AMS", "MAD", "LIS", "ZRH", "LHR",  # Europa
+    "JFK", "LAX", "IAH",  # EUA (exige visto americano mesmo só de conexão)
+]
+
+# Países com exigência de visto/autorização só para trocar de voo (passagem separada).
+_EUA = ["JFK", "EWR", "LAX", "SFO", "SEA", "IAH", "DFW", "ORD", "ATL", "MIA", "IAD", "BOS", "DTW", "MSP", "PHX", "MCO"]
+HUBS_COM_VISTO = {**{a: "EUA" for a in _EUA}, "YYZ": "Canadá", "YVR": "Canadá", "YUL": "Canadá", "LHR": "Reino Unido (ETA)"}
+
+_AMERICA_DO_SUL = {"GRU", "CGH", "VCP", "GIG", "SDU", "CNF", "PLU", "BSB", "POA", "FLN", "CWB", "SSA", "REC",
+                   "FOR", "EZE", "AEP", "MVD", "SCL", "ASU", "LIM", "BOG", "COR", "MDZ", "BRC", "IGU"}
 
 # Aeroporto → cidade (para não usar como conexão um aeroporto da própria origem/destino).
 _CIDADE_DO_AEROPORTO = {a: c for c, aeros in CIDADES.items() for a in aeros}
 
 
 def resolver(lugar: str, *, proximos: bool = True) -> list[str]:
-    """'São Paulo' → ['GRU','CGH','VCP']; 'GRU' → ['GRU'] (ou a cidade toda se proximos)."""
+    """'São Paulo' → ['GRU','CGH','VCP']; 'GRU' → ['GRU'] (ou a cidade toda se proximos).
+
+    Aceita vários lugares separados por vírgula e nomes de país ('Japão').
+    """
+    if "," in lugar:
+        out: list[str] = []
+        for parte in lugar.split(","):
+            out += [a for a in resolver(parte, proximos=proximos) if a not in out]
+        return out
     chave = lugar.strip().upper()
     chave = APELIDOS.get(chave, chave)
+    if chave in PAISES:
+        return list(PAISES[chave])
     if chave in CIDADES:
         return list(CIDADES[chave]) if proximos else CIDADES[chave][:1]
     if proximos and chave in _CIDADE_DO_AEROPORTO:
@@ -89,4 +139,5 @@ def cidade(aeroporto: str) -> str:
 
 def hubs_para(origens: list[str], destinos: list[str]) -> list[str]:
     excluir = {cidade(a) for a in origens + destinos}
-    return [h for h in HUBS if cidade(h) not in excluir]
+    regional = all(a in _AMERICA_DO_SUL for a in origens + destinos)
+    return [h for h in (HUBS if regional else HUBS_LONGOS) if cidade(h) not in excluir]

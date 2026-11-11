@@ -62,13 +62,14 @@ def _json(op: Opcao) -> dict:
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="buscador", description="Busca passagens e rotas alternativas mais baratas.")
     p.add_argument("origem", help="cidade ou código IATA (ex.: 'São Paulo', GRU)")
-    p.add_argument("destino")
+    p.add_argument("destino", help="cidade, código, país ou lista: 'Japão,Coreia,China'")
     p.add_argument("data", help="AAAA-MM-DD")
     p.add_argument("--flex", type=int, default=0, help="dias de flexibilidade para mais e para menos")
     p.add_argument("--exato", action="store_true", help="não testar aeroportos próximos")
     p.add_argument("--sem-conexoes", action="store_true", help="não montar conexões com passagens separadas")
     p.add_argument("--via", help="cidades de conexão, separadas por vírgula (ex.: POA,SCL)")
     p.add_argument("--min-conexao", type=float, default=3, help="horas mínimas entre passagens separadas (padrão 3)")
+    p.add_argument("--paralelo", type=int, default=6, help="buscas simultâneas (padrão 6)")
     p.add_argument("--top", type=int, default=10)
     p.add_argument("--json", action="store_true", help="saída em JSON")
     a = p.parse_args(argv)
@@ -83,6 +84,7 @@ def main(argv: list[str] | None = None) -> int:
             conexoes=not a.sem_conexoes,
             hubs=[h.strip().upper() for h in a.via.split(",")] if a.via else None,
             min_conexao_h=a.min_conexao,
+            paralelo=a.paralelo,
         )
     except ValueError as e:
         print(f"Erro: {e}", file=sys.stderr)

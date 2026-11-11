@@ -76,3 +76,21 @@ def test_ler_payload_ignora_item_sem_preco():
     assert len(r) == 1 and r[0].preco == 700
     assert r[0].segmentos[0].numero == "LA 8022"
     assert r[0].partida == datetime(2026, 12, 10, 13, 0)
+
+
+def test_resolver_paises_e_lista():
+    r = aeroportos.resolver("Japão,Coreia,China")
+    assert r[:4] == ["NRT", "HND", "KIX", "ICN"] and "PVG" in r
+
+
+def test_hubs_longos_para_asia():
+    hubs = aeroportos.hubs_para(["GRU"], ["NRT"])
+    assert "DOH" in hubs and "POA" not in hubs
+
+
+def test_aviso_de_visto_em_conexao_nos_eua():
+    from buscador.motor import _avisos_visto
+    s1 = Segmento("GRU", "JFK", dt(0), dt(10), "AA", "AA 1")
+    s2 = Segmento("JFK", "HND", dt(12), dt(26), "AA", "AA 2")
+    assert _avisos_visto(Itinerario(5000, ("AA",), (s1, s2)))
+    assert not _avisos_visto(it("GRU", "JFK", 3000, dt(0), dt(10)))

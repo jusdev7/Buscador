@@ -52,6 +52,8 @@ python3 -m venv .venv
 - **Passagens separadas têm risco.** Se o 1º voo atrasar, a 2ª companhia não remarca, e a bagagem precisa ser despachada de novo. O programa avisa em cada opção.
 - **Os preços mudam o tempo todo.** Confirme no site antes de comprar. A compra é feita por você.
 - Por enquanto só busca **ida**. Para ida e volta, rode duas buscas.
+- Destino pode ser país ou lista: `"Japão,Coreia,China"`. Para Ásia/Europa ele usa conexões longas (Doha, Dubai, Istambul, Europa, EUA).
+- Conexões nos EUA, Canadá e Reino Unido recebem aviso de visto, mesmo em passagem única.
 - Bagagem despachada não entra no preço.
 
 ## Testes

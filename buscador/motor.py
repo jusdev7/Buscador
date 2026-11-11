@@ -67,8 +67,8 @@ def _datas(base: str, flex: int) -> list[str]:
     return [d.isoformat() for d in ds if d >= hoje]
 
 
-def _mais_um_dia(d: str) -> str:
-    return (date.fromisoformat(d) + timedelta(days=1)).isoformat()
+def _mais_dias(d: str, n: int) -> str:
+    return (date.fromisoformat(d) + timedelta(days=n)).isoformat()
 
 
 def planejar(
@@ -76,11 +76,12 @@ def planejar(
     destinos: list[str],
     datas: list[str],
     hubs: list[str],
+    dias_conexao: int = 1,
 ) -> tuple[list[Busca], list[Busca], list[Busca]]:
     """Retorna (buscas diretas, 1º trecho via hub, 2º trecho via hub)."""
     diretas = [(o, d, dt) for dt in datas for o in origens for d in destinos]
     ida_hub = [(o, h, dt) for dt in datas for o in origens for h in hubs]
-    datas_2 = sorted(set(datas) | {_mais_um_dia(dt) for dt in datas})
+    datas_2 = sorted({_mais_dias(dt, k) for dt in datas for k in range(dias_conexao + 1)})
     hub_dest = [(h, d, dt) for dt in datas_2 for h in hubs for d in destinos]
     return diretas, ida_hub, hub_dest
 
@@ -107,6 +108,11 @@ def combinar(
     return melhor
 
 
+def _avisos_visto(it: Itinerario) -> list[str]:
+    paises = {aeroportos.HUBS_COM_VISTO[s.destino] for s in it.segmentos[:-1] if s.destino in aeroportos.HUBS_COM_VISTO}
+    return [f"Conexão em {p}: exige visto/autorização mesmo sem sair do aeroporto." for p in sorted(paises)]
+
+
 def _avisos_separada(a: Itinerario, b: Itinerario, espera: timedelta) -> list[str]:
     h = int(espera.total_seconds() // 3600)
     m = int(espera.total_seconds() % 3600 // 60)
@@ -117,6 +123,10 @@ def _avisos_separada(a: Itinerario, b: Itinerario, espera: timedelta) -> list[st
     ]
     if a.chegada.date() != b.partida.date():
         av.append(f"A conexão atravessa a noite em {a.destino}.")
+    pais = aeroportos.HUBS_COM_VISTO.get(a.destino)
+    if pais:
+        av.append(f"Conexão em {a.destino}: exige visto/autorização de {pais} para trocar de voo.")
+    av += [x for x in _avisos_visto(a) + _avisos_visto(b) if x not in av]
     return av
 
 
@@ -131,6 +141,7 @@ def pesquisar(
     hubs: list[str] | None = None,
     min_conexao_h: float = 3,
     max_conexao_h: float = 20,
+    dias_conexao: int | None = None,
     paralelo: int = 6,
     fonte: Callable[[str, str, str], list[Itinerario]] = buscar,
 ) -> Resultado:
@@ -145,7 +156,9 @@ def pesquisar(
     elif hubs is None:
         hubs = aeroportos.hubs_para(origens, destinos)
 
-    diretas, ida_hub, hub_dest = planejar(origens, destinos, datas, hubs)
+    if dias_conexao is None:  # voo longo pode chegar no dia seguinte ao da partida
+        dias_conexao = 2 if any(h in aeroportos.HUBS_LONGOS for h in hubs) else 1
+    diretas, ida_hub, hub_dest = planejar(origens, destinos, datas, hubs, dias_conexao)
     todas = list(dict.fromkeys(diretas + ida_hub + hub_dest))
 
     falhas: list[Busca] = []
@@ -164,7 +177,7 @@ def pesquisar(
     for b in diretas:
         if res[b]:
             it = res[b][0]  # já vem ordenado por preço
-            opcoes.append(Opcao("direta", it.preco, (it,)))
+            opcoes.append(Opcao("direta", it.preco, (it,), _avisos_visto(it)))
 
     lim = (timedelta(hours=min_conexao_h), timedelta(hours=max_conexao_h))
     for o, h, dt in ida_hub:
@@ -172,7 +185,7 @@ def pesquisar(
         if not leg1:
             continue
         for d in destinos:
-            leg2 = res.get((h, d, dt), []) + res.get((h, d, _mais_um_dia(dt)), [])
+            leg2 = [i for k in range(dias_conexao + 1) for i in res.get((h, d, _mais_dias(dt, k)), [])]
             leg2.sort(key=lambda i: i.preco)
             op = combinar(leg1, leg2, min_conexao=lim[0], max_conexao=lim[1])
             if op:
